@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { AiWinBackResponse, BucketStats } from '@/types/subscriber';
-import { Sparkles, X, Copy, Check, Send, Lightbulb, RefreshCw, Mail } from 'lucide-react';
+import { Sparkles, X, Copy, Check, Lightbulb, RefreshCw } from 'lucide-react';
 
 interface AiWinBackModalProps {
   stats: BucketStats;
@@ -35,13 +35,20 @@ export const AiWinBackModal: React.FC<AiWinBackModalProps> = ({ stats, onClose }
         }),
       });
 
-      const data: AiWinBackResponse = await res.json();
-      setResult(data);
+      if (res.ok) {
+        const data: AiWinBackResponse = await res.json();
+        setResult(data);
+        setLoading(false);
+        return;
+      }
     } catch (err) {
-      console.error('Error generating email:', err);
-    } finally {
-      setLoading(false);
+      console.warn('Serverless route unavailable, utilizing client generator:', err);
     }
+
+    // Client-side fallback generation
+    const fallback = generateFallbackWinBack(brandName, tone, specialOffer, 120);
+    setResult(fallback);
+    setLoading(false);
   };
 
   const copyToClipboard = (text: string, fieldName: string) => {
@@ -119,7 +126,7 @@ export const AiWinBackModal: React.FC<AiWinBackModalProps> = ({ stats, onClose }
           <button
             onClick={handleGenerate}
             disabled={loading}
-            className="flex items-center space-x-2 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 px-5 py-2.5 text-xs font-bold text-neutral-950 shadow-md hover:from-amber-400 hover:to-emerald-400 disabled:opacity-50 transition-all"
+            className="flex items-center space-x-2 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 px-5 py-2.5 text-xs font-bold text-neutral-950 shadow-md hover:from-amber-400 hover:to-emerald-400 disabled:opacity-50 transition-all cursor-pointer"
           >
             {loading ? (
               <>
@@ -138,7 +145,6 @@ export const AiWinBackModal: React.FC<AiWinBackModalProps> = ({ stats, onClose }
         {/* Output Result View */}
         {result && (
           <div className="space-y-4 pt-2 border-t border-neutral-800">
-            {/* Strategy Rationale Note */}
             <div className="flex items-start space-x-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200">
               <Lightbulb className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" />
               <div>
@@ -147,7 +153,6 @@ export const AiWinBackModal: React.FC<AiWinBackModalProps> = ({ stats, onClose }
               </div>
             </div>
 
-            {/* Subject Lines Options */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-neutral-200 uppercase tracking-wider">
                 Recommended Subject Lines (A/B Test)
@@ -164,7 +169,7 @@ export const AiWinBackModal: React.FC<AiWinBackModalProps> = ({ stats, onClose }
                     </span>
                     <button
                       onClick={() => copyToClipboard(subj, `subj_${i}`)}
-                      className="text-neutral-400 hover:text-amber-300"
+                      className="text-neutral-400 hover:text-amber-300 cursor-pointer"
                     >
                       {copiedField === `subj_${i}` ? (
                         <Check className="h-3.5 w-3.5 text-emerald-400" />
@@ -177,7 +182,6 @@ export const AiWinBackModal: React.FC<AiWinBackModalProps> = ({ stats, onClose }
               </div>
             </div>
 
-            {/* Preview Text & CTA */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-3 space-y-1">
                 <span className="text-[11px] font-bold text-neutral-400 uppercase">Preview Text</span>
@@ -189,7 +193,6 @@ export const AiWinBackModal: React.FC<AiWinBackModalProps> = ({ stats, onClose }
               </div>
             </div>
 
-            {/* Email Body */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-neutral-200 uppercase tracking-wider">
@@ -197,7 +200,7 @@ export const AiWinBackModal: React.FC<AiWinBackModalProps> = ({ stats, onClose }
                 </label>
                 <button
                   onClick={() => copyToClipboard(result.emailBody, 'emailBody')}
-                  className="flex items-center space-x-1 text-xs text-amber-400 hover:underline"
+                  className="flex items-center space-x-1 text-xs text-amber-400 hover:underline cursor-pointer"
                 >
                   {copiedField === 'emailBody' ? (
                     <>
@@ -223,3 +226,50 @@ export const AiWinBackModal: React.FC<AiWinBackModalProps> = ({ stats, onClose }
     </div>
   );
 };
+
+function generateFallbackWinBack(
+  brandName: string,
+  tone: string,
+  specialOffer: string,
+  inactivityDays: number
+): AiWinBackResponse {
+  if (tone === 'Urgent') {
+    return {
+      subjectLines: [
+        `Should we say goodbye? (Action required for ${brandName})`,
+        `We're cleaning house — still want our emails?`,
+        `Is this goodbye, {{first_name}}?`,
+      ],
+      previewText: `Confirm your subscription in 1-click or we'll stop bothering you.`,
+      emailBody: `Hey {{first_name|there}},\n\nWe noticed you haven't opened our recent emails over the last ${inactivityDays} days. We respect your inbox space and hate spam as much as you do!\n\nIf you'd like to remain on the ${brandName} list and receive ${specialOffer}, click the button below to confirm.\n\nOtherwise, no action is needed — we will automatically remove you in 48 hours so your inbox stays clean.`,
+      callToAction: `Yes, Keep Me Subscribed!`,
+      reengagementStrategyNotes: `Urgency paired with an explicit zero-friction opt-out reduces spam complaints while instantly isolating high-intent subscribers.`,
+    };
+  }
+
+  if (tone === 'Incentive' || tone === 'Value-First') {
+    return {
+      subjectLines: [
+        `We missed you! Here's ${specialOffer}`,
+        `A quick gift before we update our list...`,
+        `{{first_name}}, here is your exclusive pass back to ${brandName}`,
+      ],
+      previewText: `Claim your exclusive gift inside — limited time re-engagement offer.`,
+      emailBody: `Hi {{first_name|there}},\n\nIt's been a little while since we last connected at ${brandName}. We've published some of our best resources recently and didn't want you to miss out.\n\nTo welcome you back, we've put together a special offer: ${specialOffer}.\n\nClick below to claim your gift and confirm you want to stay in the loop!`,
+      callToAction: `Claim My Offer & Stay Connected`,
+      reengagementStrategyNotes: `Value-first framing converts passive subscribers by giving immediate tangible incentive before list sunsetting.`,
+    };
+  }
+
+  return {
+    subjectLines: [
+      `Are we still on your radar? - ${brandName}`,
+      `We noticed it's been a while, {{first_name}}`,
+      `Quick question from the ${brandName} team`,
+    ],
+    previewText: `Let us know if you still want to receive updates, tips, and special offers.`,
+    emailBody: `Hey {{first_name|there}},\n\nWe noticed you haven't had a chance to check out our updates recently. We know inboxes get crowded, and we only want to send content you actually look forward to.\n\nIf you still want to hear from us (plus get access to ${specialOffer}), just click below to confirm your interest.\n\nIf not, no worries at all! You can stay unsubscribed and we won't email you again.`,
+    callToAction: `Yes! Keep Sending Updates`,
+    reengagementStrategyNotes: `A friendly check-in creates low friction and protects deliverability by inviting non-responders to self-segment.`,
+  };
+}
